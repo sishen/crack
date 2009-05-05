@@ -7,62 +7,74 @@ require 'yaml'
 require 'strscan'
 
 module Crack
-  class JSON
-    def self.parse(json)
-      YAML.load(unescape(convert_json_to_yaml(json)))
-    rescue ArgumentError => e
-      raise ParseError, "Invalid JSON string"
+  
+  # <refactor>
+  #
+  def self.use_standard_json_time_format
+    @@use_standard_json_time_format
+  end
+  def self.use_standard_json_time_format=(val)
+    @@use_standard_json_time_format = val
+  end
+  def self.parse_json_times
+    @@parse_json_times
+  end
+  def self.parse_json_times=(val)
+    @@parse_json_times = val
+  end
+  # If true, use ISO 8601 format for dates and times. Otherwise, fall back to the Active Support legacy format.
+  @@use_standard_json_time_format = true
+  # Look for and parse json strings that look like ISO 8601 times.
+  @@parse_json_times = true
+  #
+  # </refactor>
+
+  module JSON
+    # matches YAML-formatted dates
+    DATE_REGEX = /^(?:\d{4}-\d{2}-\d{2}|\d{4}-\d{1,2}-\d{1,2}[ \t]+\d{1,2}:\d{2}:\d{2}(\.[0-9]*)?(([ \t]*)Z|[-+]\d{2}?(:\d{2})?))$/
+
+    class << self
+      attr_reader :backend
+      # delegate :decode, :to => :backend
+      
+      def decode(json)
+        @backend.decode(json)
+      end
+      alias :parse :decode
+
+      def backend=(name)
+        if name.is_a?(Module)
+          @backend = name
+        else
+          require "crack/json/backends/#{name.to_s.downcase}.rb"
+          @backend = Crack::JSON::Backends::const_get(name)
+        end
+      end
+
+      def with_backend(name)
+        old_backend, self.backend = backend, name
+        yield
+      ensure
+        self.backend = old_backend
+      end
+    end
+  end
+
+  class << self
+    def escape_html_entities_in_json
+      @escape_html_entities_in_json
     end
 
-    protected
-      def self.unescape(str)
-        str.gsub(/\\u([0-9a-f]{4})/) { [$1.hex].pack("U") }
+    def escape_html_entities_in_json=(value)
+      Crack::JSON::Encoding.escape_regex = \
+      if value
+        /[\010\f\n\r\t"\\><&]/
+      else
+        /[\010\f\n\r\t"\\]/
       end
-      
-      # matches YAML-formatted dates
-      DATE_REGEX = /^\d{4}-\d{2}-\d{2}|\d{4}-\d{1,2}-\d{1,2}[ \t]+\d{1,2}:\d{2}:\d{2}(\.[0-9]*)?(([ \t]*)Z|[-+]\d{2}?(:\d{2})?)?$/
-
-      # Ensure that ":" and "," are always followed by a space
-      def self.convert_json_to_yaml(json) #:nodoc:
-        scanner, quoting, marks, pos, times = StringScanner.new(json), false, [], nil, []
-        while scanner.scan_until(/(\\['"]|['":,\\]|\\.)/)
-          case char = scanner[1]
-          when '"', "'"
-            if !quoting
-              quoting = char
-              pos = scanner.pos
-            elsif quoting == char
-              if json[pos..scanner.pos-2] =~ DATE_REGEX
-                # found a date, track the exact positions of the quotes so we can remove them later.
-                # oh, and increment them for each current mark, each one is an extra padded space that bumps
-                # the position in the final YAML output
-                total_marks = marks.size
-                times << pos+total_marks << scanner.pos+total_marks
-              end
-              quoting = false
-            end
-          when ":",","
-            marks << scanner.pos - 1 unless quoting
-          when "\\"
-            scanner.skip(/\\/)
-          end          
-        end
-
-        if marks.empty?
-          json.gsub(/\\\//, '/')
-        else
-          left_pos  = [-1].push(*marks)
-          right_pos = marks << json.length
-          output    = []
-          left_pos.each_with_index do |left, i|
-            output << json[left.succ..right_pos[i]]
-          end
-          output = output * " "
-
-          times.each { |i| output[i-1] = ' ' }
-          output.gsub!(/\\\//, '/')
-          output
-        end
-      end
+      @escape_html_entities_in_json = value
+    end
   end
+
+  JSON.backend = 'Yaml'
 end
