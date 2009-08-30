@@ -2,7 +2,7 @@
 
 Gem::Specification.new do |s|
   s.name = %q{crack}
-  s.version = "0.1.2"
+  s.version = "0.1.4"
 
   s.required_rubygems_version = Gem::Requirement.new(">= 0") if s.respond_to? :required_rubygems_version=
   s.authors = ["John Nunemaker"]
@@ -21,6 +21,9 @@ Gem::Specification.new do |s|
     "lib/crack/core_extensions.rb",
     "lib/crack/json.rb",
     "lib/crack/xml.rb",
+    "lib/crack/json/backends/yaml.rb",
+    "lib/crack/json/backends/yajl.rb",
+    "lib/crack/json/backends/jsongem.rb",
     "test/crack_test.rb",
     "test/data/twittersearch-firefox.json",
     "test/data/twittersearch-ie.json",

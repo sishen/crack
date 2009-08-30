@@ -6,20 +6,20 @@ module Crack
     module Backends
       module Yajl
         extend self
- 
+
         # Converts a JSON string into a Ruby object.
         def decode(json)
           if !json.respond_to?(:read)
             json = StringIO.new(json)
           end
-          data = ::Yajl::Stream.parse(json)
+          data = ::Yajl::Parser.parse(json)
           if Crack.parse_json_times
             convert_dates_from(data)
           else
             data
           end
         end
- 
+
       private
         def convert_dates_from(data)
           case data
